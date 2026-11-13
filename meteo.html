@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Météo Montpellier</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(135deg, #e4b954, #170263);
+      color: #fb8728;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgb(6, 1, 59);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgb(245, 124, 77);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    .current {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .current .temp {
+      font-size: 3.5rem;
+      font-weight: 300;
+    }
+
+    .current .temp sup {
+      font-size: 1.5rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    .current .desc {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.7);
+    }
+
+    .forecast {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+    }
+
+    .day {
+      text-align: center;
+      padding: 10px 4px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.04);
+      transition: background 0.2s;
+    }
+
+    .day:hover { background: rgba(255,255,255,0.1); }
+
+    .day .label {
+      font-size: 0.7rem;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .day .max {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .day .min {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: rgba(255,255,255,0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="ville">Montpellier</h1>
+    <p class="subtitle" id="date"></p>
+    <div class="loading" id="loading">Chargement…</div>
+    <div id="content" style="display:none;">
+      <div class="current">
+        <span class="temp"><span id="temp"></span><sup>°C</sup></span>
+        <span class="desc" id="desc"></span>
+      </div>
+      <div class="forecast" id="forecast"></div>
+    </div>
+  </div>
+
+  <script>
+    // Coordonnées de Paris
+    const lat = 48.853382;
+    const lon = 2.355208;
+
+    // Correspondance des codes WMO
+    const weatherCodes = {
+      0: 'Ciel avec pas de nuages',
+      1: 'Ciel dégagé mais ya des nuages',
+      2: 'Les nuage sont pas trop là',
+      3: 'Les nuages sont présent',
+      45: 'Tu vois rien',
+      48: 'Tu vois rien glacé',
+      51: 'Tu vois un petit peu moins bien',
+      53: 'Tu vois moins bien',
+      55: 'Tu vois pas bien',
+      61: 'Ya des gouttes',
+      63: 'il pleut',
+      65: 'il pleut FORT',
+      71: 'Waouh des flocons !',
+      73: 'Youpi de la neige !',
+      75: 'Sortez la luge !',
+      80: 'un peu d eau',
+      81: 'l eau est là quoi',
+      82: 'la rivière est sur moi enft',
+      95: 'ça va PETER'
+    };
+
+    const jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+
+    async function fetchMeteo() {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Masquer le loading, afficher le contenu
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        // Date du jour
+        const now = new Date();
+        document.getElementById('date').textContent =
+          jours[now.getDay()] + ' ' + now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+
+        // Météo actuelle
+        document.getElementById('temp').textContent = data.current.temperature_2m;
+        document.getElementById('desc').textContent = weatherCodes[data.current.weather_code] || 'Inconnu';
+
+        // Prévisions 7 jours
+        const forecastEl = document.getElementById('forecast');
+        data.daily.time.forEach((dateStr, i) => {
+          const d = new Date(dateStr + 'T12:00:00');
+          const dayLabel = i === 0 ? 'Auj.' : jours[d.getDay()];
+
+          const div = document.createElement('div');
+          div.className = 'day';
+          div.innerHTML = `
+            <div class="label">${dayLabel}</div>
+            <div class="max">${data.daily.temperature_2m_max[i]}°</div>
+            <div class="min">${data.daily.temperature_2m_min[i]}°</div>
+          `;
+          forecastEl.appendChild(div);
+        });
+
+      } catch (err) {
+        document.getElementById('loading').textContent = 'Erreur de chargement : ' + err.message;
+      }
+    }
+
+    fetchMeteo();
+  </script>
+</body>
+</html>   
